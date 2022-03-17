@@ -6,4 +6,3 @@
 4. Varshith Reddy Bairy
 5. Nikitha Madhari
 6. Sharada Devi Noothalapati
-7. 
