@@ -1,0 +1,4 @@
+Page rank is an algorithm which is used by google search engine to rank web pages. 
+This also assigns numerical weighting to the each algorithm.
+PageRank results from a mathematical algorithm based on the webgraph.
+The value of rank gives the importance of particular page.
