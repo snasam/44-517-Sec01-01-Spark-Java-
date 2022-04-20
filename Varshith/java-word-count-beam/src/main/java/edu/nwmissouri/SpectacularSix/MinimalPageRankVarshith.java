@@ -3,14 +3,16 @@ package edu.nwmissouri.SpectacularSix;
 
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 
-// import org.apache.beam.model.pipeline.v1.RunnerApi.PCollection;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.Count;
+import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.Filter;
 import org.apache.beam.sdk.transforms.FlatMapElements;
 import org.apache.beam.sdk.transforms.Flatten;
@@ -25,6 +27,31 @@ import org.apache.beam.sdk.values.TypeDescriptor;
 
 
 public class MinimalPageRankVarshith {
+
+  static class Job1Finalizer extends DoFn<KV<String, Iterable<String>>, KV<String, VarshithRankedPage>> {
+    @ProcessElement
+    public void processElement(@Element KV<String, Iterable<String>> element,
+        OutputReceiver<KV<String, VarshithRankedPage>> receiver) {
+      Integer contributorVotes = 0;
+      if (element.getValue() instanceof Collection) {
+        contributorVotes = ((Collection<String>) element.getValue()).size();
+      }
+      ArrayList<VarshithVotingPage> voters = new ArrayList<VarshithVotingPage>();
+      for (String voterName : element.getValue()) {
+        if (!voterName.isEmpty()) {
+          voters.add(new VarshithVotingPage(voterName, contributorVotes));
+        }
+      }
+      receiver.output(KV.of(element.getKey(), new VarshithRankedPage(element.getKey(), voters)));
+    }
+  }
+
+  static class Job2Mapper extends DoFn<KV<String, VarshithRankedPage>, KV<String, VarshithRankedPage>> {
+  }
+
+
+  static class Job2Updater extends DoFn<KV<String, Iterable<VarshithRankedPage>>, KV<String, VarshithRankedPage>> {
+  }
 
   public static void main(String[] args) {
     deleteFiles();
@@ -69,5 +96,7 @@ public class MinimalPageRankVarshith {
       }
     }
   }
+
+  
 
 }
