@@ -33,7 +33,9 @@ Explained the java
 Described about page rank
 ## 4. Sandeep
 Explained about page rank algorithm
-## 5. Varsith
+## 5. Varshith
+Link to workspace - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/tree/main/Varshith
+Link to Wiki - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/wiki/VarshithReddyBairy
 Edited wiki page and readme
 ## 6. Shital
 Demonstrated page rank algorithm with example.
