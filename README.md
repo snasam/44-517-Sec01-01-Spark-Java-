@@ -34,8 +34,11 @@ Described about page rank
 ## 4. Sandeep
 Explained about page rank algorithm
 ## 5. Varshith
-Link to workspace - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/tree/main/Varshith
-Link to Wiki - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/wiki/VarshithReddyBairy
-Edited wiki page and readme
+Link to workspace - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/tree/main/Varshith <br>
+Link to Wiki - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/wiki/VarshithReddyBairy <br>
+Edited wiki page and readme <br>
+Created a Custom Java Maven Project For finding the Page Rank <br>
+Added a Custom Java file for finding the page rank <br>
+Added 2 more java files VotingPage and Ranked Page 
 ## 6. Shital
 Demonstrated page rank algorithm with example.
