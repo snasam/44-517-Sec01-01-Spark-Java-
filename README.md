@@ -32,7 +32,11 @@ Explained the java
 ## 3. Anusha 
 Described about page rank
 ## 4. Sandeep
-Explained about page rank algorithm
+Link to Repo -https://github.com/snasam/44-517-Sec01-01-Spark-Java-.git <br>
+Link to Individual Repo - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/tree/main/Sandeep <br>
+Link to Wiki - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/wiki/SandeepNadendla <br>
+In this project I am implementing Google PageRank <br>
+Google PageRank using Apache Beam with Java SDK <br>
 ## 5. Varshith
 Link to workspace - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/tree/main/Varshith <br>
 Link to Wiki - https://github.com/snasam/44-517-Sec01-01-Spark-Java-/wiki/VarshithReddyBairy <br>
