@@ -17,6 +17,7 @@ import org.apache.beam.sdk.transforms.FlatMapElements;
 import org.apache.beam.sdk.transforms.Flatten;
 import org.apache.beam.sdk.transforms.GroupByKey;
 import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionList;
@@ -46,10 +47,32 @@ public class MinimalPageRankSandeep {
     }
   }
 
-  static class Job2Mapper extends DoFn<KV<String, SandeepRankedPage>, KV<String, SandeepRankedPage>> {}
+  static class Job2Mapper extends DoFn<KV<String, SandeepRankedPage>, KV<String, SandeepRankedPage>> {
+    @ProcessElement
+     public void processElement(@Element KV<String, SandeepRankedPage> element, OutputReceiver<KV<String, SandeepRankedPage>> receiver) {
+     Integer votes = 0;
+      ArrayList<SandeepVotingPage> voters = element.getValue().getVoters();
+       if (voters instanceof Collection) {
+         votes = ((Collection<SandeepVotingPage>) voters).size(); 
+       }
+    for (SandeepVotingPage vp : voters) {
+      String pageName = vp.getName();
+       Double pageRank = vp.getRank();
+        String contributingPageName = element.getKey();
+         Double contributingPageRank = element.getValue().getRank();
+          SandeepVotingPage contributor = new SandeepVotingPage(contributingPageName, contributingPageRank, votes);
+           ArrayList<SandeepVotingPage> arr = new ArrayList<SandeepVotingPage>();
+            arr.add(contributor);
+             receiver.output(KV.of(vp.getName(), new SandeepRankedPage(pageName, pageRank, arr))); 
+    }
+  }
+    
+  }
 
-  
-  static class Job2Updater extends DoFn<KV<String, Iterable<SandeepRankedPage>>, KV<String, SandeepRankedPage>> {}
+
+  static class Job2Updater extends DoFn<KV<String, Iterable<SandeepRankedPage>>, KV<String, SandeepRankedPage>> {
+    
+  }
 
 
 
@@ -93,7 +116,9 @@ public class MinimalPageRankSandeep {
 
     PCollection<KV<String, String>> myMergeLst = myLst.apply(Flatten.<KV<String,String>>pCollections());
 
-    PCollection<KV<String, Iterable<String>>> groupByLst = myMergeLst.apply(GroupByKey.<String, String>create());
+    PCollection<KV<String, Iterable<String>>> MakinggGoupByLst = myMergeLst.apply(GroupByKey.<String, String>create());
+
+    PCollection<KV<String, SandeepRankedPage>> groupByLst = MakinggGoupByLst.apply(ParDo.of(new Job1Finalizer()));
 
     PCollection<String> pckvLinksStrings =  groupByLst.apply(
       MapElements.into(  
