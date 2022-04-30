@@ -47,6 +47,11 @@ public class SandeepVotingPage implements Serializable {
         return String.format("%s, %.5f,%d", this.name, this.rank, this.voters);   
      }
 
+
+    public double getVotes() {
+        return 0;
+    }
+
     
 
 

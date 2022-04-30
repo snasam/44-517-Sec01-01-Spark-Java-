@@ -1,6 +1,7 @@
 
 package edu.nwmissouri.spectacularSix;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -47,37 +48,56 @@ public class MinimalPageRankSandeep {
     }
   }
 
-  static class Job2Mapper extends DoFn<KV<String, SandeepRankedPage>, KV<String, SandeepRankedPage>> {
-    @ProcessElement
-     public void processElement(@Element KV<String, SandeepRankedPage> element, OutputReceiver<KV<String, SandeepRankedPage>> receiver) {
-     Integer votes = 0;
-      ArrayList<SandeepVotingPage> voters = element.getValue().getVoters();
-       if (voters instanceof Collection) {
-         votes = ((Collection<SandeepVotingPage>) voters).size(); 
-       }
-    for (SandeepVotingPage vp : voters) {
-      String pageName = vp.getName();
-       Double pageRank = vp.getRank();
-        String contributingPageName = element.getKey();
-         Double contributingPageRank = element.getValue().getRank();
+  static class Job2Mapper extends DoFn<KV<String,SandeepRankedPage>, KV<String, SandeepRankedPage>>{
+      @ProcessElement
+      public void processElement(@Element KV<String, SandeepRankedPage> element,
+      OutputReceiver<KV<String,SandeepRankedPage>> receiver){
+        Integer votes = 0;
+        ArrayList<SandeepVotingPage> voters = element.getValue().getVoters();
+        if(voters instanceof Collection){
+           votes = ((Collection<SandeepVotingPage>)voters).size();
+        }
+        for(SandeepVotingPage vp: voters){
+          String pageName = vp.getName();
+          Double pageRank = vp.getRank();
+          String contributingPageName = element.getKey();
+          Double contributingPageRank = element.getValue().getRank();
           SandeepVotingPage contributor = new SandeepVotingPage(contributingPageName, contributingPageRank, votes);
-           ArrayList<SandeepVotingPage> arr = new ArrayList<SandeepVotingPage>();
-            arr.add(contributor);
-             receiver.output(KV.of(vp.getName(), new SandeepRankedPage(pageName, pageRank, arr))); 
-    }
+          ArrayList<SandeepVotingPage> arr = new ArrayList<SandeepVotingPage>();
+          arr.add(contributor);
+          receiver.output(KV.of(vp.getName(), new SandeepRankedPage(pageName,pageRank,arr)));
+        }
+      }
   }
-    
-  }
+
 
 
   static class Job2Updater extends DoFn<KV<String, Iterable<SandeepRankedPage>>, KV<String, SandeepRankedPage>> {
-    
-  }
+    @ProcessElement
+    public void processElement(@Element KV<String, Iterable<SandeepRankedPage>> element,
+        OutputReceiver<KV<String, SandeepRankedPage>> receiver) {
+    String page = element.getKey();
+    Iterable<SandeepRankedPage> rankedPages = element.getValue();
+    Double dampingFactor = 0.85;
+    Double updatedRank = (1-dampingFactor);
+    ArrayList<SandeepVotingPage> newVoters = new ArrayList<SandeepVotingPage>();
+    for(SandeepRankedPage pg : rankedPages){
+      if(pg != null){
+        for(SandeepVotingPage vPage : pg.getVoters()){
+          newVoters.add(vPage);
+          updatedRank += (dampingFactor) * vPage.getRank() / (double)vPage.getVotes();
+        }
+      }
+    }
+    receiver.output(KV.of(page, new SandeepRankedPage(page, updatedRank, newVoters)));
+    }
 
+  }
 
 
 
   public static void main(String[] args) {
+    deleteFiles();
 
     PipelineOptions options = PipelineOptionsFactory.create();
 
@@ -118,18 +138,37 @@ public class MinimalPageRankSandeep {
 
     PCollection<KV<String, Iterable<String>>> MakinggGoupByLst = myMergeLst.apply(GroupByKey.<String, String>create());
 
-    PCollection<KV<String, SandeepRankedPage>> groupByLst = MakinggGoupByLst.apply(ParDo.of(new Job1Finalizer()));
+    PCollection<KV<String, SandeepRankedPage>> jobOne = MakinggGoupByLst.apply(ParDo.of(new Job1Finalizer()));
 
-    PCollection<String> pckvLinksStrings =  groupByLst.apply(
+
+    PCollection<KV<String, SandeepRankedPage>> updatedOut = null;
+PCollection<KV<String, SandeepRankedPage>> mappedKVs = null;
+
+int iterations =50;
+for (int i =0; i<iterations; i++){
+  if(i==0){
+    mappedKVs = jobOne
+      .apply(ParDo.of(new Job2Mapper()));
+  }else{
+    mappedKVs = updatedOut
+      .apply(ParDo.of(new Job2Mapper()));
+  }      
+  PCollection<KV<String, Iterable<SandeepRankedPage>>> reducedKVs = mappedKVs
+    .apply(GroupByKey.<String, SandeepRankedPage>create());
+  updatedOut = reducedKVs.apply(ParDo.of(new Job2Updater()));
+}
+
+    PCollection<String> pckvLinks =  updatedOut.apply(
       MapElements.into(  
         TypeDescriptors.strings())
-          .via((myMergeLstout) -> myMergeLstout.toString()));
+          .via((myMergeLstout) -> myMergeLstout.toString())
+        );
 
   
-        pckvLinksStrings.apply(TextIO.write().to("Sandeepwordcounts"));
+    pckvLinks.apply(TextIO.write().to("Sandeepwordcounts"));
        
 
-        p.run().waitUntilFinish();
+    p.run().waitUntilFinish();
   }
 
   private static PCollection<KV<String, String>> sandeepFirstMapJob(Pipeline p, String dataFile, String dataPath) {
@@ -151,7 +190,14 @@ public class MinimalPageRankSandeep {
     return pckvLinks;
   }
 
-
+  public static  void deleteFiles(){
+    final File file = new File("./");
+    for (File f : file.listFiles()){
+      if(f.getName().startsWith("Sandeep")){
+        f.delete();
+      }
+    }
+  }
 
 
 
