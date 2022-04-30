@@ -1,9 +1,8 @@
 package edu.nwmissouri.SpectacularSix;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
-
-//import org.apache.beam.model.pipeline.v1.RunnerApi.PCollection;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.options.PipelineOptions;
@@ -13,10 +12,11 @@ import org.apache.beam.sdk.transforms.Filter;
 import org.apache.beam.sdk.transforms.Flatten;
 import org.apache.beam.sdk.transforms.GroupByKey;
 import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.TypeDescriptors;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionList;
-import org.apache.beam.sdk.values.TypeDescriptors;
 
 public class MinimalPageRankNoothalapati {
 
@@ -39,75 +39,104 @@ public class MinimalPageRankNoothalapati {
   }
 
   static class Job2Mapper extends DoFn<KV<String, SharadaRankedPage>, KV<String, SharadaRankedPage>> {
+    @ProcessElement
+    public void processElement(@Element KV<String, SharadaRankedPage> element,
+        OutputReceiver<KV<String, SharadaRankedPage>> receiver) {
+      Integer votes = 0;
+      ArrayList<SharadaVotingPage> voters = element.getValue().getVoters();
+      if (voters instanceof Collection) {
+        votes = ((Collection<SharadaVotingPage>) voters).size();
+      }
+      for (SharadaVotingPage vp : voters) {
+        String pageName = vp.getName();
+        Double pageRank = vp.getRank();
+        String contributingPageName = element.getKey();
+        Double contributingPageRank = element.getValue().getRank();
+        SharadaVotingPage contributor = new SharadaVotingPage(contributingPageName, contributingPageRank, votes);
+        ArrayList<SharadaVotingPage> arr = new ArrayList<SharadaVotingPage>();
+        arr.add(contributor);
+        receiver.output(KV.of(vp.getName(), new SharadaRankedPage(pageName, pageRank, arr)));
+      }
+    }
   }
 
   static class Job2Updater extends DoFn<KV<String, Iterable<SharadaRankedPage>>, KV<String, SharadaRankedPage>> {
+    @ProcessElement
+    public void processElement(@Element KV<String, Iterable<SharadaRankedPage>> element,
+        OutputReceiver<KV<String, SharadaRankedPage>> receiver) {
+      String page = element.getKey();
+      Iterable<SharadaRankedPage> rankedPages = element.getValue();
+      Double dampingFactor = 0.85;
+      Double updatedRank = (1 - dampingFactor);
+      ArrayList<SharadaVotingPage> newVoters = new ArrayList<SharadaVotingPage>();
+      for (SharadaRankedPage pg : rankedPages) {
+        if (pg != null) {
+          for (SharadaVotingPage vPage : pg.getVoters()) {
+            newVoters.add(vPage);
+            updatedRank += (dampingFactor) * vPage.getRank() / (double) vPage.getVotes();
+          }
+        }
+      }
+      receiver.output(KV.of(page, new SharadaRankedPage(page, updatedRank, newVoters)));
+    }
   }
 
   public static void main(String[] args) {
-
+    deleteFiles();
     PipelineOptions options = PipelineOptionsFactory.create();
-
     Pipeline p = Pipeline.create(options);
-
     String dataFolder = "web04";
-    String dataFile = "go.md";
-    String dataPath = dataFolder + "/" + dataFile;
-    // p.apply(TextIO.read().from("gs://apache-beam-samples/shakespeare/kinglear.txt"))
+    PCollection<KV<String, String>> p1 = SharadaMapper01(p, "go.md", dataFolder);
+    PCollection<KV<String, String>> p2 = SharadaMapper01(p, "python.md", dataFolder);
+    PCollection<KV<String, String>> p3 = SharadaMapper01(p, "java.md", dataFolder);
+    PCollection<KV<String, String>> p4 = SharadaMapper01(p, "README.md", dataFolder);
+    PCollectionList<KV<String, String>> pCollectionList = PCollectionList.of(p1).and(p2).and(p3).and(p4);
+    PCollection<KV<String, String>> mergedList = pCollectionList.apply(Flatten.<KV<String, String>>pCollections());
+    PCollection<KV<String, Iterable<String>>> gBK = mergedList.apply(GroupByKey.<String, String>create());
+    PCollection<KV<String, SharadaRankedPage>> job2in = gBK.apply(ParDo.of(new Job1Finalizer()));
+    PCollection<KV<String, SharadaRankedPage>> updatedOutput = null;
+    PCollection<KV<String, SharadaRankedPage>> mappedKVs = null;
 
-    PCollection<KV<String, String>> pckvLinksKV1 = SharadaFirstMapJob(p, dataFile, dataPath);
+    int iterations = 50;
+    for (int i = 0; i < iterations; i++) {
+      if (i == 0) {
+        mappedKVs = job2in
+            .apply(ParDo.of(new Job2Mapper()));
+      } else {
+        mappedKVs = updatedOutput
+            .apply(ParDo.of(new Job2Mapper()));
+      }
+      PCollection<KV<String, Iterable<SharadaRankedPage>>> reducedKVs = mappedKVs
+          .apply(GroupByKey.<String, SharadaRankedPage>create());
+      updatedOutput = reducedKVs.apply(ParDo.of(new Job2Updater()));
+    }
 
-    dataFile = "java.md";
-    dataPath = dataFolder + "/" + dataFile;
-    // p.apply(TextIO.read().from("gs://apache-beam-samples/shakespeare/kinglear.txt"))
-
-    PCollection<KV<String, String>> pckvLinksKV2 = SharadaFirstMapJob(p, dataFile, dataPath);
-
-    dataFile = "python.md";
-    dataPath = dataFolder + "/" + dataFile;
-    // p.apply(TextIO.read().from("gs://apache-beam-samples/shakespeare/kinglear.txt"))
-
-    PCollection<KV<String, String>> pckvLinksKV3 = SharadaFirstMapJob(p, dataFile, dataPath);
-
-    dataFile = "README.md";
-    dataPath = dataFolder + "/" + dataFile;
-    // p.apply(TextIO.read().from("gs://apache-beam-samples/shakespeare/kinglear.txt"))
-
-    PCollection<KV<String, String>> pckvLinksKV4 = SharadaFirstMapJob(p, dataFile, dataPath);
-
-    PCollectionList<KV<String, String>> myLst = PCollectionList.of(pckvLinksKV1).and(pckvLinksKV2).and(pckvLinksKV3)
-        .and(pckvLinksKV4);
-
-    PCollection<KV<String, String>> myMergeLst = myLst.apply(Flatten.<KV<String, String>>pCollections());
-
-    PCollection<KV<String, Iterable<String>>> groupByLst = myMergeLst.apply(GroupByKey.<String, String>create());
-
-    PCollection<String> pckvLinksStrings = groupByLst.apply(
-        MapElements.into(
-            TypeDescriptors.strings())
-            .via((myMergeLstout) -> myMergeLstout.toString()));
-
-    pckvLinksStrings.apply(TextIO.write().to("Sharadawordcounts"));
-
+    PCollection<String> pLinksString = updatedOutput
+        .apply(MapElements.into(TypeDescriptors.strings()).via((mergeOut) -> mergeOut.toString()));
+    pLinksString.apply(TextIO.write().to("SharadaPR"));
     p.run().waitUntilFinish();
   }
 
-  private static PCollection<KV<String, String>> SharadaFirstMapJob(Pipeline p, String dataFile, String dataPath) {
-    PCollection<String> pcInputLines = p.apply(TextIO.read().from(dataPath));
-    PCollection<String> pclLines = pcInputLines.apply(Filter.by((String line) -> !line.isEmpty()));
-    PCollection<String> pcInputEmptyLines = pclLines.apply(Filter.by((String line) -> !line.equals("")));
-    PCollection<String> pcInputLinkLines = pcInputEmptyLines.apply(Filter.by((String line) -> line.startsWith("[")));
+  public static PCollection<KV<String, String>> SharadaMapper01(Pipeline p, String filename, String dataFolder) {
 
-    PCollection<String> pcInputLinks = pcInputLinkLines.apply(
-        MapElements.into(TypeDescriptors.strings())
-            .via((String linelink) -> linelink.substring(linelink.indexOf("(") + 1, linelink.indexOf(")"))));
+    String newdataPath = dataFolder + "/" + filename;
+    PCollection<String> pcolInput = p.apply(TextIO.read().from(newdataPath));
+    PCollection<String> pcollinkLines = pcolInput.apply(Filter.by((String line) -> line.startsWith("[")));
+    PCollection<String> pcolLinks = pcollinkLines.apply(MapElements.into((TypeDescriptors.strings()))
+        .via((String linkLine) -> linkLine.substring(linkLine.indexOf("(") + 1, linkLine.length() - 1)));
+    PCollection<KV<String, String>> pColKVPairs = pcolLinks
+        .apply(MapElements.into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
+            .via((String outLink) -> KV.of(filename, outLink)));
+    return pColKVPairs;
+  }
 
-    PCollection<KV<String, String>> pckvLinks = pcInputLinks.apply(
-        MapElements.into(
-            TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
-            .via(linelink -> KV.of(dataFile, linelink)));
-
-    return pckvLinks;
+  public static void deleteFiles() {
+    final File file = new File("./");
+    for (File f : file.listFiles()) {
+      if (f.getName().startsWith("Sharada")) {
+        f.delete();
+      }
+    }
   }
 
 }
