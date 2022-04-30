@@ -2,9 +2,11 @@
 package edu.nwmissouri.spectacularSix;
 
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 
 //import org.apache.beam.model.pipeline.v1.RunnerApi.PCollection;
 import org.apache.beam.sdk.Pipeline;
@@ -94,6 +96,23 @@ public class MinimalPageRankSandeep {
 
   }
 
+  static class Job3Finder extends DoFn<KV<String, SandeepRankedPage>, KV<String, Double>> {
+		@ProcessElement
+		public void processElement(@Element KV<String, SandeepRankedPage> element,
+				OutputReceiver<KV<String, Double>> receiver) {
+			String currentPage = element.getKey();
+			Double currentPageRank = element.getValue().getRank();
+
+			receiver.output(KV.of(currentPage, currentPageRank));
+		}
+	}
+
+	public static class Job3Final implements Comparator<KV<String, Double>>, Serializable {
+		@Override
+		public int compare(KV<String, Double> o1, KV<String, Double> o2) {
+			return o1.getValue().compareTo(o2.getValue());
+		}
+	}
 
 
   public static void main(String[] args) {
